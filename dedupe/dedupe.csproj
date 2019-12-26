@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net472</TargetFramework>
+        <Authors>Mark Bell</Authors>
+        <Platforms>AnyCPU</Platforms>
+        <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+        <LangVersion>latest</LangVersion>
+        <NoWarn>1701;1702;1591</NoWarn>
+    </PropertyGroup>
+</Project>
