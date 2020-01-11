@@ -11,11 +11,13 @@ namespace dedupe
 {
     internal static class Program
     {
-        internal static void Main(string[] args)
+        internal static int Main(string[] args)
         {
             if (args.Length != 2)
             {
                 Console.WriteLine("Usage: dedupe <folder> <output>");
+
+                return -1;
             }
 
             var folder = args[0];
@@ -35,38 +37,78 @@ namespace dedupe
 
             var entryList = new Dictionary<(string, int), List<FileSystemEntry>>();
 
+            // First, we add all files to a dictionary keyed on file name and size
+            // If a file has the same name *and* size, it's almost definitely a duplicate
             foreach (var entry in entries)
             {
                 var key = (entry.Filename, entry.Size);
 
                 if (!entryList.ContainsKey(key))
                 {
-                    entryList.Add(key, new List<FileSystemEntry> { entry });
-                    continue;
+                    entryList.Add(key, new List<FileSystemEntry>());
                 }
 
                 entryList[key].Add(entry);
             }
 
-            // Only list files where there are duplicates
-            foreach (var entry in entryList.Where(kvp => kvp.Value.Count > 1))
+            string getDestinationPathFor(FileSystemEntry f, string basePath) =>
+                $@"{basePath}\{Path.GetFileNameWithoutExtension(f.Filename)}_DUPLICATE_FROM_{new DirectoryInfo(Path.GetDirectoryName(f.Path)).Name}{Path.GetExtension(f.Filename)}";
+
+            // Now we can figure out which files there are multiple copies of
+            foreach (var entry in entryList)
             {
-                for (var i = 0; i < entry.Value.Count; i++)
+                // This *should* be the original
+                var oldest = entry.Value[0];
+
+                var destinationPath = $@"{output}\{oldest.Filename}";
+
+                if (File.Exists(destinationPath))
                 {
-                    if (i == 0)
+                    // We've already copied a file with this name to the output folder,
+                    // so there must be multiple files with the same name but different
+                    // content. In this case, we just copy it to a different file name.
+                    WriteError($"    DUPLICATE (DIFFERENT CONTENT): {oldest}");
+
+                    File.Copy(oldest.Path, getDestinationPathFor(oldest, output));
+                }
+                else
+                {
+                    WriteSuccess(oldest);
+
+                    File.Copy(oldest.Path, destinationPath);
+                }
+
+                foreach (var file in entry.Value.Skip(1))
+                {
+                    // Anything after the first file with this size/name key is a duplicate
+                    WriteError($"    DUPLICATE (SAME NAME AND SIZE): {file}");
+
+                    var duplicateFolder = $@"{output}\{entry.Key.Item1}_DUPLICATES";
+
+                    if (!Directory.Exists(duplicateFolder))
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine(entry.Value[i]);
-                        Console.ResetColor();
+                        Directory.CreateDirectory(duplicateFolder);
                     }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine("    DUPLICATE: " + entry.Value[i]);
-                        Console.ResetColor();
-                    }
+
+                    File.Copy(file.Path, getDestinationPathFor(file, duplicateFolder));
                 }
             }
+
+            return 0;
+        }
+
+        private static void WriteSuccess(object o)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(o);
+            Console.ResetColor();
+        }
+
+        private static void WriteError(object o)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkRed;
+            Console.WriteLine(o);
+            Console.ResetColor();
         }
     }
 }
