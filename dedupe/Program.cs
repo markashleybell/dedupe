@@ -54,6 +54,8 @@ namespace dedupe
             string getDestinationPathFor(FileSystemEntry f, string basePath) =>
                 $@"{basePath}\{Path.GetFileNameWithoutExtension(f.Filename)}_DUPLICATE_FROM_{new DirectoryInfo(Path.GetDirectoryName(f.Path)).Name}{Path.GetExtension(f.Filename)}";
 
+            var log = new List<string>();
+
             // Now we can figure out which files there are multiple copies of
             foreach (var entry in entryList)
             {
@@ -69,7 +71,16 @@ namespace dedupe
                     // content. In this case, we just copy it to a different file name.
                     WriteError($"    DUPLICATE (DIFFERENT CONTENT): {oldest}");
 
-                    File.Copy(oldest.Path, getDestinationPathFor(oldest, output));
+                    var dp = getDestinationPathFor(oldest, output);
+
+                    try
+                    {
+                        File.Copy(oldest.Path, dp);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Add($"{oldest.Path}|{dp}|{ex.Message}");
+                    }
                 }
                 else
                 {
@@ -93,6 +104,8 @@ namespace dedupe
                     File.Copy(file.Path, getDestinationPathFor(file, duplicateFolder));
                 }
             }
+
+            File.WriteAllLines($@"{output}\errors.log", log);
 
             return 0;
         }
